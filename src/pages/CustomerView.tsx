@@ -1,11 +1,20 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Product, getProductImage } from "@/lib/data";
+import { getProductImage } from "@/lib/data";
 import { supabase } from "@/integrations/supabase/client";
 import { Package, Phone, MapPin, Clock, ChevronRight, Sparkles, PartyPopper } from "lucide-react";
 
+interface PublicProduct {
+  id: string;
+  name: string;
+  unit: string;
+  selling_price: number;
+  image_url: string | null;
+  quality: string;
+}
+
 export default function CustomerView() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<PublicProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -14,14 +23,10 @@ export default function CustomerView() {
 
   const fetchProducts = async () => {
     try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, name, unit, selling_price, image_url, is_active")
-        .eq("is_active", true)
-        .order("name");
-
+      const { data, error } = await supabase.functions.invoke('public-products');
+      
       if (error) throw error;
-      setProducts(data as Product[]);
+      setProducts(data?.products || []);
     } catch (error) {
       console.error("Error fetching products:", error);
     } finally {
