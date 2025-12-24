@@ -106,9 +106,10 @@ export default function CustomerView() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {products.map((product, index) => (
-                <div
+                <Link
+                  to={`/product/${product.id}`}
                   key={product.id}
-                  className="card-product animate-fade-in"
+                  className="card-product animate-fade-in group cursor-pointer"
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
                   {/* Product Image */}
@@ -125,7 +126,7 @@ export default function CustomerView() {
 
                   {/* Product Info */}
                   <div className="p-5">
-                    <h3 className="text-lg font-display font-semibold text-foreground">
+                    <h3 className="text-lg font-display font-semibold text-foreground group-hover:text-primary transition-colors">
                       {product.name}
                     </h3>
                     <p className="text-sm text-muted-foreground mb-3">per {product.unit}</p>
@@ -136,7 +137,7 @@ export default function CustomerView() {
                       <span className="text-sm text-muted-foreground">/{product.unit}</span>
                     </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
