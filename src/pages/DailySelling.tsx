@@ -1,11 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { products } from "@/lib/data";
+import { Product, getProductImage } from "@/lib/data";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { CalendarIcon, Package, Users, Plus, Check } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 export default function DailySelling() {
-  const { toast } = useToast();
+  const { user } = useAuth();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [recentSales, setRecentSales] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     productId: "",
@@ -14,22 +20,102 @@ export default function DailySelling() {
     deliveryDate: new Date().toISOString().split("T")[0],
   });
 
-  const selectedProduct = products.find((p) => p.id === formData.productId);
+  const today = new Date().toISOString().split("T")[0];
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast({
-      title: "Sale Recorded",
-      description: `Sold ${formData.quantity} ${selectedProduct?.unit} of ${selectedProduct?.name}`,
-    });
-    setFormData({
-      date: new Date().toISOString().split("T")[0],
-      productId: "",
-      quantity: "",
-      customerType: "Daily",
-      deliveryDate: new Date().toISOString().split("T")[0],
-    });
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      // Fetch products
+      const { data: productsData } = await supabase
+        .from("products")
+        .select("*")
+        .eq("is_active", true)
+        .order("name");
+
+      if (productsData) {
+        setProducts(productsData as Product[]);
+      }
+
+      // Fetch today's sales
+      const { data: salesData } = await supabase
+        .from("selling_entries")
+        .select(`
+          id, quantity, selling_price, customer_type, created_at,
+          products (id, name, unit)
+        `)
+        .eq("date", today)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (salesData) {
+        setRecentSales(salesData);
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const selectedProduct = products.find((p) => p.id === formData.productId);
+  const isFutureOrder = formData.customerType !== "Daily" && formData.deliveryDate > today;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    // Validate stock
+    if (selectedProduct && !isFutureOrder && Number(formData.quantity) > selectedProduct.current_stock) {
+      toast.error(`Insufficient stock. Available: ${selectedProduct.current_stock} ${selectedProduct.unit}`);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.from("selling_entries").insert({
+        product_id: formData.productId,
+        date: formData.date,
+        quantity: Number(formData.quantity),
+        selling_price: selectedProduct?.selling_price || 0,
+        customer_type: formData.customerType,
+        delivery_date: formData.customerType !== "Daily" ? formData.deliveryDate : null,
+        entered_by: user.id,
+        is_future_order: isFutureOrder,
+      });
+
+      if (error) throw error;
+
+      toast.success(`Sold ${formData.quantity} ${selectedProduct?.unit} of ${selectedProduct?.name}`);
+      
+      setFormData({
+        date: new Date().toISOString().split("T")[0],
+        productId: "",
+        quantity: "",
+        customerType: "Daily",
+        deliveryDate: new Date().toISOString().split("T")[0],
+      });
+
+      // Refresh data
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to record sale");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <DashboardLayout title="Daily Selling Entry" subtitle="Loading...">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout
@@ -69,7 +155,7 @@ export default function DailySelling() {
                 <option value="">Select a product</option>
                 {products.map((product) => (
                   <option key={product.id} value={product.id}>
-                    {product.name} ({product.unit}) - Stock: {product.currentStock}
+                    {product.name} ({product.unit}) - Stock: {product.current_stock}
                   </option>
                 ))}
               </select>
@@ -78,17 +164,17 @@ export default function DailySelling() {
               {selectedProduct && (
                 <div className="mt-3 flex items-center gap-4 p-3 rounded-lg bg-muted/50">
                   <img
-                    src={selectedProduct.image}
+                    src={getProductImage(selectedProduct.name)}
                     alt={selectedProduct.name}
                     className="h-16 w-16 rounded-lg object-cover"
                   />
                   <div>
                     <p className="font-medium text-foreground">{selectedProduct.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      Selling Price: ₹{selectedProduct.sellingPrice} / {selectedProduct.unit}
+                      Selling Price: ₹{selectedProduct.selling_price} / {selectedProduct.unit}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Available: {selectedProduct.currentStock} {selectedProduct.unit}
+                      Available: {selectedProduct.current_stock} {selectedProduct.unit}
                     </p>
                   </div>
                 </div>
@@ -107,12 +193,12 @@ export default function DailySelling() {
                 className="input-dairy"
                 placeholder="Enter quantity"
                 min="1"
-                max={selectedProduct?.currentStock}
+                max={isFutureOrder ? undefined : selectedProduct?.current_stock}
                 required
               />
               {selectedProduct && formData.quantity && (
                 <p className="mt-2 text-sm text-success font-medium">
-                  Total: ₹{(selectedProduct.sellingPrice * Number(formData.quantity)).toLocaleString()}
+                  Total: ₹{(selectedProduct.selling_price * Number(formData.quantity)).toLocaleString()}
                 </p>
               )}
             </div>
@@ -156,13 +242,28 @@ export default function DailySelling() {
                   min={new Date().toISOString().split("T")[0]}
                   required
                 />
+                {isFutureOrder && (
+                  <p className="mt-2 text-sm text-accent">
+                    This will be recorded as a future order (stock won't be deducted now)
+                  </p>
+                )}
               </div>
             )}
 
             {/* Submit Button */}
-            <button type="submit" className="btn-primary w-full">
-              <Plus className="h-4 w-4 mr-2" />
-              Record Sale
+            <button 
+              type="submit" 
+              className="btn-primary w-full"
+              disabled={submitting}
+            >
+              {submitting ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-foreground"></div>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Record Sale
+                </>
+              )}
             </button>
           </div>
         </form>
@@ -172,31 +273,33 @@ export default function DailySelling() {
           <h3 className="text-lg font-display font-semibold text-foreground mb-4">
             Today's Sales
           </h3>
-          <div className="space-y-3">
-            {[
-              { product: "Fresh Milk", quantity: 80, type: "Daily", amount: 4800 },
-              { product: "Paneer", quantity: 10, type: "Wedding", amount: 3200 },
-              { product: "Curd", quantity: 20, type: "Party", amount: 1600 },
-            ].map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-4 rounded-lg bg-card border border-border"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-success/10 flex items-center justify-center">
-                    <Check className="h-4 w-4 text-success" />
+          {recentSales.length > 0 ? (
+            <div className="space-y-3">
+              {recentSales.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between p-4 rounded-lg bg-card border border-border"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-success/10 flex items-center justify-center">
+                      <Check className="h-4 w-4 text-success" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">{item.products?.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {item.quantity} {item.products?.unit} • {item.customer_type}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-foreground">{item.product}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {item.quantity} units • {item.type}
-                    </p>
-                  </div>
+                  <span className="font-semibold text-success">
+                    ₹{(item.quantity * item.selling_price).toLocaleString()}
+                  </span>
                 </div>
-                <span className="font-semibold text-success">₹{item.amount.toLocaleString()}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm">No sales recorded today</p>
+          )}
         </div>
       </div>
     </DashboardLayout>

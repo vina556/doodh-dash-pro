@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { DashboardCard } from "@/components/DashboardCard";
-import { products, sampleSales, samplePurchases } from "@/lib/data";
+import { Product, getProductImage } from "@/lib/data";
+import { supabase } from "@/integrations/supabase/client";
 import {
   ShoppingCart,
   Receipt,
@@ -12,34 +14,102 @@ import {
 } from "lucide-react";
 
 export default function AdminDashboard() {
-  // Calculate today's purchase summary
-  const todayPurchases = samplePurchases.filter((p) => p.date === "2024-01-15");
-  const totalPurchaseAmount = todayPurchases.reduce((acc, p) => {
-    const product = products.find((prod) => prod.id === p.productId);
-    return acc + (product?.purchasePrice || 0) * p.quantity;
-  }, 0);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [todayPurchases, setTodayPurchases] = useState<number>(0);
+  const [todaySales, setTodaySales] = useState<number>(0);
+  const [purchaseCount, setPurchaseCount] = useState<number>(0);
+  const [salesCount, setSalesCount] = useState<number>(0);
+  const [futureOrders, setFutureOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Calculate today's selling summary
-  const todaySales = sampleSales.filter((s) => s.date === "2024-01-15");
-  const totalSalesAmount = todaySales.reduce((acc, s) => {
-    const product = products.find((prod) => prod.id === s.productId);
-    return acc + (product?.sellingPrice || 0) * s.quantity;
-  }, 0);
+  const today = new Date().toISOString().split("T")[0];
 
-  // Calculate profit
-  const totalProfit = totalSalesAmount - totalPurchaseAmount;
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
 
-  // Low stock products
-  const lowStockProducts = products.filter((p) => p.currentStock <= p.minStock);
+  const fetchDashboardData = async () => {
+    try {
+      // Fetch products
+      const { data: productsData } = await supabase
+        .from("products")
+        .select("*")
+        .eq("is_active", true);
+      
+      if (productsData) {
+        setProducts(productsData as Product[]);
+      }
 
-  // Tomorrow's orders
-  const futureOrders = sampleSales.filter((s) => s.deliveryDate > "2024-01-15");
+      // Fetch today's purchases
+      const { data: purchasesData } = await supabase
+        .from("purchase_entries")
+        .select("quantity, purchase_price")
+        .eq("date", today);
 
-  // Price changes (mock data)
+      if (purchasesData) {
+        const total = purchasesData.reduce((sum, p) => sum + (p.quantity * p.purchase_price), 0);
+        setTodayPurchases(total);
+        setPurchaseCount(purchasesData.length);
+      }
+
+      // Fetch today's sales
+      const { data: salesData } = await supabase
+        .from("selling_entries")
+        .select("quantity, selling_price")
+        .eq("date", today)
+        .eq("is_future_order", false);
+
+      if (salesData) {
+        const total = salesData.reduce((sum, s) => sum + (s.quantity * s.selling_price), 0);
+        setTodaySales(total);
+        setSalesCount(salesData.length);
+      }
+
+      // Fetch future orders
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split("T")[0];
+
+      const { data: ordersData } = await supabase
+        .from("selling_entries")
+        .select(`
+          id, quantity, customer_type, delivery_date,
+          products (id, name, unit)
+        `)
+        .eq("is_future_order", true)
+        .eq("is_fulfilled", false)
+        .gte("delivery_date", today)
+        .order("delivery_date", { ascending: true })
+        .limit(5);
+
+      if (ordersData) {
+        setFutureOrders(ordersData);
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totalProfit = todaySales - todayPurchases;
+  const lowStockProducts = products.filter((p) => p.current_stock <= p.minimum_stock);
+
+  // Price changes (mock data for now - can be fetched from price_history later)
   const priceChanges = [
     { product: "Fresh Milk", change: 5, isIncrease: true },
     { product: "Ghee", change: -10, isIncrease: false },
   ];
+
+  if (loading) {
+    return (
+      <DashboardLayout title="Dashboard" subtitle="Loading...">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout title="Dashboard" subtitle="Overview of today's business">
@@ -47,16 +117,16 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <DashboardCard
           title="Today's Purchases"
-          value={`₹${totalPurchaseAmount.toLocaleString()}`}
+          value={`₹${todayPurchases.toLocaleString()}`}
           icon={ShoppingCart}
-          subtitle={`${todayPurchases.length} transactions`}
+          subtitle={`${purchaseCount} transactions`}
           trend={{ value: 12, isPositive: true }}
         />
         <DashboardCard
           title="Today's Sales"
-          value={`₹${totalSalesAmount.toLocaleString()}`}
+          value={`₹${todaySales.toLocaleString()}`}
           icon={Receipt}
-          subtitle={`${todaySales.length} orders`}
+          subtitle={`${salesCount} orders`}
           trend={{ value: 8, isPositive: true }}
           variant="success"
         />
@@ -92,14 +162,14 @@ export default function AdminDashboard() {
                   className="flex items-center gap-3 p-3 rounded-lg bg-warning/5 border border-warning/20"
                 >
                   <img
-                    src={product.image}
+                    src={getProductImage(product.name)}
                     alt={product.name}
                     className="h-12 w-12 rounded-lg object-cover"
                   />
                   <div className="flex-1">
                     <p className="font-medium text-foreground">{product.name}</p>
                     <p className="text-sm text-warning">
-                      {product.currentStock} / {product.minStock} {product.unit}
+                      {product.current_stock} / {product.minimum_stock} {product.unit}
                     </p>
                   </div>
                   <span className="badge-warning">Low</span>
@@ -119,31 +189,28 @@ export default function AdminDashboard() {
           </div>
           {futureOrders.length > 0 ? (
             <div className="space-y-3">
-              {futureOrders.map((order) => {
-                const product = products.find((p) => p.id === order.productId);
-                return (
-                  <div
-                    key={order.id}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-accent/5 border border-accent/20"
-                  >
-                    <img
-                      src={product?.image}
-                      alt={product?.name}
-                      className="h-12 w-12 rounded-lg object-cover"
-                    />
-                    <div className="flex-1">
-                      <p className="font-medium text-foreground">{product?.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {order.quantity} {product?.unit} • {order.customerType}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs text-muted-foreground">Delivery</span>
-                      <p className="text-sm font-medium text-accent">{order.deliveryDate}</p>
-                    </div>
+              {futureOrders.map((order) => (
+                <div
+                  key={order.id}
+                  className="flex items-center gap-3 p-3 rounded-lg bg-accent/5 border border-accent/20"
+                >
+                  <img
+                    src={getProductImage(order.products?.name || "")}
+                    alt={order.products?.name}
+                    className="h-12 w-12 rounded-lg object-cover"
+                  />
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground">{order.products?.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {order.quantity} {order.products?.unit} • {order.customer_type}
+                    </p>
                   </div>
-                );
-              })}
+                  <div className="text-right">
+                    <span className="text-xs text-muted-foreground">Delivery</span>
+                    <p className="text-sm font-medium text-accent">{order.delivery_date}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <p className="text-muted-foreground text-sm">No upcoming orders</p>

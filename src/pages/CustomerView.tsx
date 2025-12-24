@@ -1,8 +1,34 @@
-import { products } from "@/lib/data";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { Product, getProductImage } from "@/lib/data";
+import { supabase } from "@/integrations/supabase/client";
 import { Package, Phone, MapPin, Clock, ChevronRight, Sparkles, PartyPopper } from "lucide-react";
 
 export default function CustomerView() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, unit, selling_price, image_url, is_active")
+        .eq("is_active", true)
+        .order("name");
+
+      if (error) throw error;
+      setProducts(data as Product[]);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -68,41 +94,47 @@ export default function CustomerView() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {products.map((product, index) => (
-              <div
-                key={product.id}
-                className="card-product animate-fade-in"
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
-                {/* Product Image */}
-                <div className="relative aspect-square overflow-hidden bg-muted">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                  <div className="absolute top-3 left-3">
-                    <span className="badge-fresh">{product.quality}</span>
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {products.map((product, index) => (
+                <div
+                  key={product.id}
+                  className="card-product animate-fade-in"
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  {/* Product Image */}
+                  <div className="relative aspect-square overflow-hidden bg-muted">
+                    <img
+                      src={getProductImage(product.name)}
+                      alt={product.name}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <div className="absolute top-3 left-3">
+                      <span className="badge-fresh">Fresh</span>
+                    </div>
                   </div>
-                </div>
 
-                {/* Product Info */}
-                <div className="p-5">
-                  <h3 className="text-lg font-display font-semibold text-foreground">
-                    {product.name}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-3">per {product.unit}</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl font-bold text-primary">
-                      ₹{product.sellingPrice}
-                    </span>
-                    <span className="text-sm text-muted-foreground">/{product.unit}</span>
+                  {/* Product Info */}
+                  <div className="p-5">
+                    <h3 className="text-lg font-display font-semibold text-foreground">
+                      {product.name}
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-3">per {product.unit}</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-2xl font-bold text-primary">
+                        ₹{product.selling_price}
+                      </span>
+                      <span className="text-sm text-muted-foreground">/{product.unit}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

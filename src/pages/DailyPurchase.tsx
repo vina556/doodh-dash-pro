@@ -1,11 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { products } from "@/lib/data";
+import { Product, getProductImage } from "@/lib/data";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { CalendarIcon, Package, User, Plus, Check } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 export default function DailyPurchase() {
-  const { toast } = useToast();
+  const { user, isAdminOrManager } = useAuth();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [recentPurchases, setRecentPurchases] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     productId: "",
@@ -13,21 +19,92 @@ export default function DailyPurchase() {
     supplierName: "",
   });
 
+  const today = new Date().toISOString().split("T")[0];
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      // Fetch products
+      const { data: productsData } = await supabase
+        .from("products")
+        .select("*")
+        .eq("is_active", true)
+        .order("name");
+
+      if (productsData) {
+        setProducts(productsData as Product[]);
+      }
+
+      // Fetch today's purchases
+      const { data: purchasesData } = await supabase
+        .from("purchase_entries")
+        .select(`
+          id, quantity, purchase_price, supplier_name, created_at,
+          products (id, name, unit)
+        `)
+        .eq("date", today)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (purchasesData) {
+        setRecentPurchases(purchasesData);
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const selectedProduct = products.find((p) => p.id === formData.productId);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Purchase Added",
-      description: `Added ${formData.quantity} ${selectedProduct?.unit} of ${selectedProduct?.name}`,
-    });
-    setFormData({
-      date: new Date().toISOString().split("T")[0],
-      productId: "",
-      quantity: "",
-      supplierName: "",
-    });
+    if (!user) return;
+
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.from("purchase_entries").insert({
+        product_id: formData.productId,
+        date: formData.date,
+        quantity: Number(formData.quantity),
+        purchase_price: selectedProduct?.purchase_price || 0,
+        supplier_name: formData.supplierName,
+        entered_by: user.id,
+      });
+
+      if (error) throw error;
+
+      toast.success(`Added ${formData.quantity} ${selectedProduct?.unit} of ${selectedProduct?.name}`);
+      
+      setFormData({
+        date: new Date().toISOString().split("T")[0],
+        productId: "",
+        quantity: "",
+        supplierName: "",
+      });
+
+      // Refresh data
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to add purchase");
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <DashboardLayout title="Daily Purchase Entry" subtitle="Loading...">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout
@@ -76,15 +153,17 @@ export default function DailyPurchase() {
               {selectedProduct && (
                 <div className="mt-3 flex items-center gap-4 p-3 rounded-lg bg-muted/50">
                   <img
-                    src={selectedProduct.image}
+                    src={getProductImage(selectedProduct.name)}
                     alt={selectedProduct.name}
                     className="h-16 w-16 rounded-lg object-cover"
                   />
                   <div>
                     <p className="font-medium text-foreground">{selectedProduct.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Purchase Price: ₹{selectedProduct.purchasePrice} / {selectedProduct.unit}
-                    </p>
+                    {isAdminOrManager && (
+                      <p className="text-sm text-muted-foreground">
+                        Purchase Price: ₹{selectedProduct.purchase_price} / {selectedProduct.unit}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -104,9 +183,9 @@ export default function DailyPurchase() {
                 min="1"
                 required
               />
-              {selectedProduct && formData.quantity && (
+              {isAdminOrManager && selectedProduct && formData.quantity && (
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Total: ₹{(selectedProduct.purchasePrice * Number(formData.quantity)).toLocaleString()}
+                  Total: ₹{(selectedProduct.purchase_price * Number(formData.quantity)).toLocaleString()}
                 </p>
               )}
             </div>
@@ -128,9 +207,19 @@ export default function DailyPurchase() {
             </div>
 
             {/* Submit Button */}
-            <button type="submit" className="btn-primary w-full">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Purchase Entry
+            <button 
+              type="submit" 
+              className="btn-primary w-full"
+              disabled={submitting}
+            >
+              {submitting ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-foreground"></div>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Purchase Entry
+                </>
+              )}
             </button>
           </div>
         </form>
@@ -140,30 +229,35 @@ export default function DailyPurchase() {
           <h3 className="text-lg font-display font-semibold text-foreground mb-4">
             Today's Purchases
           </h3>
-          <div className="space-y-3">
-            {[
-              { product: "Fresh Milk", quantity: 100, supplier: "Farm Fresh", amount: 4500 },
-              { product: "Paneer", quantity: 25, supplier: "Paneer House", amount: 6250 },
-            ].map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-4 rounded-lg bg-card border border-border"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-success/10 flex items-center justify-center">
-                    <Check className="h-4 w-4 text-success" />
+          {recentPurchases.length > 0 ? (
+            <div className="space-y-3">
+              {recentPurchases.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between p-4 rounded-lg bg-card border border-border"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-success/10 flex items-center justify-center">
+                      <Check className="h-4 w-4 text-success" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">{item.products?.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {item.quantity} {item.products?.unit} • {item.supplier_name}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-foreground">{item.product}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {item.quantity} units • {item.supplier}
-                    </p>
-                  </div>
+                  {isAdminOrManager && (
+                    <span className="font-semibold text-foreground">
+                      ₹{(item.quantity * item.purchase_price).toLocaleString()}
+                    </span>
+                  )}
                 </div>
-                <span className="font-semibold text-foreground">₹{item.amount.toLocaleString()}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm">No purchases recorded today</p>
+          )}
         </div>
       </div>
     </DashboardLayout>
