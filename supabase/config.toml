@@ -1,1 +1,4 @@
 project_id = "vkargnamrzulnlspixjv"
+
+[functions.public-products]
+verify_jwt = false
