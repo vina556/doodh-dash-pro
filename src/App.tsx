@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import CustomerView from "./pages/CustomerView";
+import ProductDetail from "./pages/ProductDetail";
 import Login from "./pages/Login";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProductManagement from "./pages/ProductManagement";
@@ -35,6 +36,7 @@ function AppRoutes() {
     <Routes>
       {/* Public Routes */}
       <Route path="/" element={<CustomerView />} />
+      <Route path="/product/:productId" element={<ProductDetail />} />
       <Route path="/login" element={<Login />} />
 
       {/* Admin & Manager Routes */}
