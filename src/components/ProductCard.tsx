@@ -1,4 +1,4 @@
-import { Product } from "@/lib/data";
+import { Product, getProductImage } from "@/lib/data";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface ProductCardProps {
@@ -15,26 +15,25 @@ export function ProductCard({
   showProfit = false,
   variant = "admin",
 }: ProductCardProps) {
-  const { role } = useAuth();
-  const isLowStock = product.currentStock <= product.minStock;
-  const profit = product.sellingPrice - product.purchasePrice;
-  const canSeePurchasePrice = role === "admin" && showPurchasePrice;
-  const canSeeProfit = role === "admin" && showProfit;
+  const { isAdminOrManager } = useAuth();
+  const isLowStock = product.current_stock <= product.minimum_stock;
+  const profit = product.selling_price - product.purchase_price;
+  const canSeePurchasePrice = isAdminOrManager && showPurchasePrice;
+  const canSeeProfit = isAdminOrManager && showProfit;
+  const productImage = product.image_url || getProductImage(product.name);
 
   return (
     <div className="card-product group">
       {/* Product Image */}
       <div className="relative aspect-square overflow-hidden bg-muted">
         <img
-          src={product.image}
+          src={productImage}
           alt={product.name}
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
         {/* Quality Badge */}
         <div className="absolute top-3 left-3">
-          <span className={product.quality === "Fresh" ? "badge-fresh" : "badge-fresh"}>
-            {product.quality}
-          </span>
+          <span className="badge-fresh">Fresh</span>
         </div>
         {/* Low Stock Badge */}
         {isLowStock && variant !== "customer" && (
@@ -53,18 +52,18 @@ export function ProductCard({
           {/* Selling Price */}
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Selling Price</span>
-            <span className="text-lg font-bold text-primary">₹{product.sellingPrice}</span>
+            <span className="text-lg font-bold text-primary">₹{product.selling_price}</span>
           </div>
 
-          {/* Purchase Price - Admin Only */}
+          {/* Purchase Price - Admin/Manager Only */}
           {canSeePurchasePrice && (
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Purchase Price</span>
-              <span className="text-sm font-medium text-foreground">₹{product.purchasePrice}</span>
+              <span className="text-sm font-medium text-foreground">₹{product.purchase_price}</span>
             </div>
           )}
 
-          {/* Profit - Admin Only */}
+          {/* Profit - Admin/Manager Only */}
           {canSeeProfit && (
             <div className="flex items-center justify-between border-t border-border pt-2">
               <span className="text-sm font-medium text-muted-foreground">Profit</span>
@@ -77,7 +76,7 @@ export function ProductCard({
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Stock</span>
               <span className={`text-sm font-medium ${isLowStock ? "text-destructive" : "text-foreground"}`}>
-                {product.currentStock} {product.unit}
+                {product.current_stock} {product.unit}
               </span>
             </div>
           )}

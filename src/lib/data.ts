@@ -5,114 +5,93 @@ import gheeImg from "@/assets/ghee.png";
 import curdImg from "@/assets/curd.png";
 import creamImg from "@/assets/cream.png";
 
+// Image mapping for products
+export const productImages: Record<string, string> = {
+  "Milk": milkImg,
+  "Fresh Milk": milkImg,
+  "Paneer": paneerImg,
+  "Butter": butterImg,
+  "Ghee": gheeImg,
+  "Pure Ghee": gheeImg,
+  "Curd": curdImg,
+  "Cream": creamImg,
+  "Fresh Cream": creamImg,
+};
+
 export interface Product {
   id: string;
   name: string;
-  image: string;
+  image_url: string | null;
   unit: "Litre" | "Kg" | "Packet";
-  minStock: number;
-  currentStock: number;
-  sellingPrice: number;
-  purchasePrice: number;
-  quality: "Fresh" | "Pure";
+  minimum_stock: number;
+  current_stock: number;
+  selling_price: number;
+  purchase_price: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
-export const products: Product[] = [
-  {
-    id: "1",
-    name: "Fresh Milk",
-    image: milkImg,
-    unit: "Litre",
-    minStock: 50,
-    currentStock: 120,
-    sellingPrice: 60,
-    purchasePrice: 45,
-    quality: "Fresh",
-  },
-  {
-    id: "2",
-    name: "Paneer",
-    image: paneerImg,
-    unit: "Kg",
-    minStock: 20,
-    currentStock: 15,
-    sellingPrice: 320,
-    purchasePrice: 250,
-    quality: "Fresh",
-  },
-  {
-    id: "3",
-    name: "Butter",
-    image: butterImg,
-    unit: "Kg",
-    minStock: 15,
-    currentStock: 25,
-    sellingPrice: 520,
-    purchasePrice: 420,
-    quality: "Pure",
-  },
-  {
-    id: "4",
-    name: "Pure Ghee",
-    image: gheeImg,
-    unit: "Kg",
-    minStock: 10,
-    currentStock: 8,
-    sellingPrice: 650,
-    purchasePrice: 520,
-    quality: "Pure",
-  },
-  {
-    id: "5",
-    name: "Curd",
-    image: curdImg,
-    unit: "Kg",
-    minStock: 30,
-    currentStock: 45,
-    sellingPrice: 80,
-    purchasePrice: 55,
-    quality: "Fresh",
-  },
-  {
-    id: "6",
-    name: "Fresh Cream",
-    image: creamImg,
-    unit: "Litre",
-    minStock: 10,
-    currentStock: 12,
-    sellingPrice: 280,
-    purchasePrice: 200,
-    quality: "Fresh",
-  },
-];
-
-export interface DailyPurchase {
+export interface PurchaseEntry {
   id: string;
+  product_id: string;
   date: string;
-  productId: string;
   quantity: number;
-  supplierName: string;
+  purchase_price: number;
+  supplier_name: string | null;
+  entered_by: string;
+  created_at: string;
+  products?: Product;
 }
 
-export interface DailySale {
+export interface SellingEntry {
   id: string;
+  product_id: string;
   date: string;
-  productId: string;
   quantity: number;
-  customerType: "Daily" | "Wedding" | "Party";
-  deliveryDate: string;
+  selling_price: number;
+  customer_type: "Daily" | "Wedding" | "Party";
+  delivery_date: string | null;
+  entered_by: string;
+  is_future_order: boolean;
+  is_fulfilled: boolean;
+  created_at: string;
+  products?: Product;
 }
 
-export const samplePurchases: DailyPurchase[] = [
-  { id: "p1", date: "2024-01-15", productId: "1", quantity: 100, supplierName: "Farm Fresh Dairy" },
-  { id: "p2", date: "2024-01-15", productId: "2", quantity: 25, supplierName: "Paneer House" },
-  { id: "p3", date: "2024-01-15", productId: "4", quantity: 15, supplierName: "Ghee Traders" },
-];
+export interface Profile {
+  id: string;
+  user_id: string;
+  full_name: string;
+  phone: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
-export const sampleSales: DailySale[] = [
-  { id: "s1", date: "2024-01-15", productId: "1", quantity: 80, customerType: "Daily", deliveryDate: "2024-01-15" },
-  { id: "s2", date: "2024-01-15", productId: "2", quantity: 10, customerType: "Wedding", deliveryDate: "2024-01-20" },
-  { id: "s3", date: "2024-01-15", productId: "5", quantity: 20, customerType: "Party", deliveryDate: "2024-01-18" },
-];
+export interface ActivityLog {
+  id: string;
+  user_id: string;
+  action: string;
+  table_name: string;
+  record_id: string | null;
+  details: Record<string, unknown> | null;
+  created_at: string;
+}
 
-export type UserRole = "admin" | "manager" | "worker" | null;
+export interface DailySummary {
+  id: string;
+  summary_date: string;
+  stock_summary: Record<string, unknown>;
+  order_summary: Record<string, unknown>;
+  summary_hash: string;
+  created_at: string;
+}
+
+// Helper to get product image
+export function getProductImage(name: string): string {
+  return productImages[name] || "/placeholder.svg";
+}
+
+// Legacy type for backwards compatibility
+export type UserRole = "founder" | "manager" | "worker" | "customer" | null;

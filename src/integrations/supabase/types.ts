@@ -14,16 +14,323 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      activity_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          record_id: string | null
+          table_name: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          record_id?: string | null
+          table_name: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          record_id?: string | null
+          table_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      daily_summaries: {
+        Row: {
+          created_at: string | null
+          id: string
+          order_summary: Json
+          stock_summary: Json
+          summary_date: string
+          summary_hash: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          order_summary: Json
+          stock_summary: Json
+          summary_date: string
+          summary_hash: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          order_summary?: Json
+          stock_summary?: Json
+          summary_date?: string
+          summary_hash?: string
+        }
+        Relationships: []
+      }
+      price_history: {
+        Row: {
+          changed_by: string
+          created_at: string | null
+          id: string
+          new_purchase_price: number | null
+          new_selling_price: number | null
+          old_purchase_price: number | null
+          old_selling_price: number | null
+          product_id: string
+        }
+        Insert: {
+          changed_by: string
+          created_at?: string | null
+          id?: string
+          new_purchase_price?: number | null
+          new_selling_price?: number | null
+          old_purchase_price?: number | null
+          old_selling_price?: number | null
+          product_id: string
+        }
+        Update: {
+          changed_by?: string
+          created_at?: string | null
+          id?: string
+          new_purchase_price?: number | null
+          new_selling_price?: number | null
+          old_purchase_price?: number | null
+          old_selling_price?: number | null
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          created_at: string | null
+          current_stock: number
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          minimum_stock: number
+          name: string
+          purchase_price: number
+          selling_price: number
+          unit: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_stock?: number
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          minimum_stock?: number
+          name: string
+          purchase_price: number
+          selling_price: number
+          unit: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_stock?: number
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          minimum_stock?: number
+          name?: string
+          purchase_price?: number
+          selling_price?: number
+          unit?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          full_name: string
+          id: string
+          is_active: boolean | null
+          phone: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          full_name: string
+          id?: string
+          is_active?: boolean | null
+          phone?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          full_name?: string
+          id?: string
+          is_active?: boolean | null
+          phone?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      purchase_entries: {
+        Row: {
+          created_at: string | null
+          date: string
+          entered_by: string
+          id: string
+          product_id: string
+          purchase_price: number
+          quantity: number
+          supplier_name: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          date?: string
+          entered_by: string
+          id?: string
+          product_id: string
+          purchase_price: number
+          quantity: number
+          supplier_name?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          entered_by?: string
+          id?: string
+          product_id?: string
+          purchase_price?: number
+          quantity?: number
+          supplier_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_entries_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      selling_entries: {
+        Row: {
+          created_at: string | null
+          customer_type: string
+          date: string
+          delivery_date: string | null
+          entered_by: string
+          id: string
+          is_fulfilled: boolean | null
+          is_future_order: boolean | null
+          product_id: string
+          quantity: number
+          selling_price: number
+        }
+        Insert: {
+          created_at?: string | null
+          customer_type: string
+          date?: string
+          delivery_date?: string | null
+          entered_by: string
+          id?: string
+          is_fulfilled?: boolean | null
+          is_future_order?: boolean | null
+          product_id: string
+          quantity: number
+          selling_price: number
+        }
+        Update: {
+          created_at?: string | null
+          customer_type?: string
+          date?: string
+          delivery_date?: string | null
+          entered_by?: string
+          id?: string
+          is_fulfilled?: boolean | null
+          is_future_order?: boolean | null
+          product_id?: string
+          quantity?: number
+          selling_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "selling_entries_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_future_orders: {
+        Args: { target_date?: string }
+        Returns: {
+          customer_type: string
+          delivery_date: string
+          id: string
+          product_id: string
+          product_name: string
+          quantity: number
+        }[]
+      }
+      get_low_stock_products: {
+        Args: never
+        Returns: {
+          current_stock: number
+          id: string
+          minimum_stock: number
+          name: string
+          unit: string
+        }[]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin_or_manager: { Args: { _user_id: string }; Returns: boolean }
+      is_staff: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "founder" | "manager" | "worker" | "customer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +457,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["founder", "manager", "worker", "customer"],
+    },
   },
 } as const

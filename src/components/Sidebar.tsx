@@ -1,12 +1,10 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { Logo } from "@/components/Logo";
 import {
   LayoutDashboard,
   Package,
   ShoppingCart,
   Receipt,
-  Users,
   LogOut,
   Menu,
   X,
@@ -32,15 +30,15 @@ const workerLinks = [
 ];
 
 export function Sidebar() {
-  const { role, logout } = useAuth();
+  const { role, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
 
-  const links = role === "admin" ? adminLinks : role === "manager" ? managerLinks : workerLinks;
+  const links = role === "founder" ? adminLinks : role === "manager" ? managerLinks : workerLinks;
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await signOut();
     navigate("/login");
   };
 
